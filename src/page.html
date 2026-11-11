@@ -104,6 +104,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .hinttext { display: grid; gap: 6px; min-width: 0; font-size: 14px; line-height: 1.45; }
 .hinttext b.t { font-family: var(--display); font-size: 18px; font-weight: 600; color: var(--hint); }
 .hinttext .err { color: var(--wrong); }
+.proof { border-left: 3px solid var(--hypo); padding-left: 10px; color: var(--ink); }
 .check { display: flex; gap: 8px; align-items: center; cursor: pointer; font-size: 14px; }
 .check input { width: 17px; height: 17px; accent-color: var(--accent); }
 .hypobar { border-color: var(--hypo); background: var(--hypo-soft); }
@@ -483,7 +484,7 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
     else {
       var lvl = st.level === 3 ? 'Technique avancée' : st.level === 2 ? 'Technique intermédiaire' : 'Technique de base';
       if (hint.stage === 1) ht.innerHTML = '<span class="label">' + lvl + '</span><b class="t">' + st.title + '</b><span>Les cases en bleu forment le motif. À toi de trouver ' + (st.place ? 'le chiffre à poser.' : 'ce qu’il élimine.') + '</span>';
-      else ht.innerHTML = '<span class="label">' + lvl + '</span><b class="t">' + st.title + '</b><span>' + st.text + '</span><span class="small">' + (st.place ? 'À poser : ' + st.place[1] + ' en ' + SE.name(st.place[0]) + '.' : 'Éliminations en rouge : ' + st.elim.map(function (e) { return e[1] + ' en ' + SE.name(e[0]); }).join(', ') + '.') + '</span>';
+      else ht.innerHTML = '<span class="label">' + lvl + '</span><b class="t">' + st.title + '</b><span>' + st.text + '</span>' + (st.proof ? '<span class="proof">' + st.proof + '</span>' : '') + '<span class="small">' + (st.place ? 'À poser : ' + st.place[1] + ' en ' + SE.name(st.place[0]) + '.' : 'Éliminations en rouge : ' + st.elim.map(function (e) { return e[1] + ' en ' + SE.name(e[0]); }).join(', ') + '.') + '</span>';
       ha.hidden = false; $('hintMore').hidden = hint.stage !== 1; $('hintApply').hidden = hint.stage !== 2;
     }
     // en-tête

@@ -1,5 +1,5 @@
 /* Service worker : met l'appli en cache pour qu'elle marche sans réseau. Change VERSION à chaque mise à jour. */
-var VERSION = 'sudoku-v3';
+var VERSION = 'sudoku-v4';
 var CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(VERSION).then(function (c) { return c.addAll(CORE); }).then(function () { return self.skipWaiting(); }));

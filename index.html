@@ -122,6 +122,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .hinttext { display: grid; gap: 6px; min-width: 0; font-size: 14px; line-height: 1.45; }
 .hinttext b.t { font-family: var(--display); font-size: 18px; font-weight: 600; color: var(--hint); }
 .hinttext .err { color: var(--wrong); }
+.proof { border-left: 3px solid var(--hypo); padding-left: 10px; color: var(--ink); }
 .check { display: flex; gap: 8px; align-items: center; cursor: pointer; font-size: 14px; }
 .check input { width: 17px; height: 17px; accent-color: var(--accent); }
 .hypobar { border-color: var(--hypo); background: var(--hypo-soft); }
@@ -271,6 +272,7 @@ var SE = (function () {
   function digits(m) { var r = []; for (var d = 1; d <= 9; d++) if (m & bit(d)) r.push(d); return r; }
   function name(i) { return 'L' + (ROW[i] + 1) + 'C' + (COL[i] + 1); }
   function unitName(u) { return u < 9 ? 'ligne ' + (u + 1) : u < 18 ? 'colonne ' + (u - 8) : 'bloc ' + (u - 17); }
+  function laUnit(u) { return (u >= 18 ? 'le ' : 'la ') + unitName(u); }
   function shuffle(a, rnd) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rnd() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 
   /* ---- solveur par retour arrière (compte jusqu'à limit solutions) ---- */
@@ -332,6 +334,7 @@ var SE = (function () {
     }
     return e;
   }
+  function withProof(st, proof) { st.proof = proof; return st; }
   function keyOf(cells, mask) { var k = {}; cells.forEach(function (c) { k[c] = mask; }); return k; }
   function commonPeers(a, b) { var r = []; for (var i = 0; i < 81; i++) if (i !== a && i !== b && SEES[a][i] && SEES[b][i]) r.push(i); return r; }
 
@@ -345,7 +348,7 @@ var SE = (function () {
     for (var u = 0; u < 27; u++) for (var d = 1; d <= 9; d++) {
       var pos = UNITS[u].filter(function (i) { return c[i] & bit(d); });
       if (pos.length === 1 && pc(c[pos[0]]) > 1) {
-        yield mk('hsingle', UNITS[u].filter(function (i) { return !v[i]; }), keyOf(pos, bit(d)), [], [pos[0], d], 'Dans la ' + unitName(u) + ', le ' + d + ' ne peut aller qu’en ' + name(pos[0]) + '.');
+        yield mk('hsingle', UNITS[u].filter(function (i) { return !v[i]; }), keyOf(pos, bit(d)), [], [pos[0], d], 'Dans ' + laUnit(u) + ', le ' + d + ' ne peut aller qu’en ' + name(pos[0]) + '.');
       }
     }
   }
@@ -367,7 +370,7 @@ var SE = (function () {
       if (p2.every(function (i) { return BOX[i] === BOX[p2[0]]; })) {
         var bx = 18 + BOX[p2[0]];
         var e2 = elimFrom(c, UNITS[bx], bit(d), p2);
-        if (e2.length) yield mk('claiming', p2, keyOf(p2, bit(d)), e2, null, 'Sur la ' + unitName(u) + ', le ' + d + ' est forcément dans le ' + unitName(bx) + ' (cases ' + p2.map(name).join(', ') + '). On peut l’éliminer du reste du bloc.');
+        if (e2.length) yield mk('claiming', p2, keyOf(p2, bit(d)), e2, null, 'Sur ' + laUnit(u) + ', le ' + d + ' est forcément dans le ' + unitName(bx) + ' (cases ' + p2.map(name).join(', ') + '). On peut l’éliminer du reste du bloc.');
       }
     }
   }
@@ -379,7 +382,7 @@ var SE = (function () {
         var x = empt[a], y = empt[b];
         if (pc(c[x]) === 2 && c[x] === c[y]) {
           var e = elimFrom(c, empt, c[x], [x, y]);
-          if (e.length) yield mk('npair', [x, y], keyOf([x, y], c[x]), e, null, 'Les cases ' + name(x) + ' et ' + name(y) + ' ne contiennent que ' + digits(c[x]).join(' et ') + ' : ces deux chiffres leur sont réservés dans la ' + unitName(u) + '.');
+          if (e.length) yield mk('npair', [x, y], keyOf([x, y], c[x]), e, null, 'Les cases ' + name(x) + ' et ' + name(y) + ' ne contiennent que ' + digits(c[x]).join(' et ') + ' : ces deux chiffres leur sont réservés dans ' + laUnit(u) + '.');
         }
       }
       // paire cachée
@@ -388,7 +391,7 @@ var SE = (function () {
         if (p1.length === 2 && q2.length === 2 && p1[0] === q2[0] && p1[1] === q2[1]) {
           var m = bit(d1) | bit(d2);
           var e3 = elimFrom(c, p1, ALL & ~m);
-          if (e3.length) yield mk('hpair', p1, keyOf(p1, m), e3, null, 'Dans la ' + unitName(u) + ', ' + d1 + ' et ' + d2 + ' ne peuvent aller qu’en ' + name(p1[0]) + ' et ' + name(p1[1]) + ' : les autres candidats de ces deux cases disparaissent.');
+          if (e3.length) yield mk('hpair', p1, keyOf(p1, m), e3, null, 'Dans ' + laUnit(u) + ', ' + d1 + ' et ' + d2 + ' ne peuvent aller qu’en ' + name(p1[0]) + ' et ' + name(p1[1]) + ' : les autres candidats de ces deux cases disparaissent.');
         }
       }
       // triplet nu
@@ -396,7 +399,7 @@ var SE = (function () {
         var cs = [empt[a], empt[b], empt[k]], um = c[cs[0]] | c[cs[1]] | c[cs[2]];
         if (pc(um) === 3 && cs.every(function (i) { return pc(c[i]) >= 2; })) {
           var e4 = elimFrom(c, empt, um, cs);
-          if (e4.length) yield mk('ntriple', cs, keyOf(cs, um), e4, null, 'Les cases ' + cs.map(name).join(', ') + ' se partagent les seuls chiffres ' + digits(um).join(', ') + ' dans la ' + unitName(u) + '.');
+          if (e4.length) yield mk('ntriple', cs, keyOf(cs, um), e4, null, 'Les cases ' + cs.map(name).join(', ') + ' se partagent les seuls chiffres ' + digits(um).join(', ') + ' dans ' + laUnit(u) + '.');
         }
       }
     }
@@ -414,8 +417,11 @@ var SE = (function () {
         var cells = [A[0], A[1], B[0], B[1]];
         var cu1 = (t === 0 ? 9 : 0) + cover[A[0]], cu2 = (t === 0 ? 9 : 0) + cover[A[1]];
         var e = elimFrom(c, UNITS[cu1].concat(UNITS[cu2]), bit(d), cells);
-        if (e.length) yield mk('xwing', cells, keyOf(cells, bit(d)), e, null,
-          'Sur les ' + (t === 0 ? 'lignes ' : 'colonnes ') + (a + 1) + ' et ' + (b + 1) + ', le ' + d + ' n’a que deux places, alignées sur les mêmes ' + (t === 0 ? 'colonnes ' : 'lignes ') + (cover[A[0]] + 1) + ' et ' + (cover[A[1]] + 1) + '. Le ' + d + ' occupe donc forcément deux coins opposés du rectangle : on l’élimine du reste de ces ' + (t === 0 ? 'colonnes.' : 'lignes.'));
+        var tx = e.length ? e[0][0] : 0, inFirst = cover[tx] === cover[A[0]];
+        var cA = inFirst ? A[0] : A[1], cB = inFirst ? B[0] : B[1], oA = inFirst ? A[1] : A[0], oB = inFirst ? B[1] : B[0];
+        var pfx = 'Pour le vérifier en mode Hypothèse : pose un ' + d + ' en ' + name(tx) + '. Le ' + d + ' disparaît de ' + name(cA) + ' et ' + name(cB) + '. Les ' + (t === 0 ? 'lignes ' : 'colonnes ') + (a + 1) + ' et ' + (b + 1) + ' n\u2019ont alors plus qu\u2019une place chacune pour le ' + d + ' : ' + name(oA) + ' et ' + name(oB) + '. Mais ces deux cases sont sur la même ' + (t === 0 ? 'colonne' : 'ligne') + ' : deux ' + d + ' alignés, contradiction.';
+        if (e.length) yield withProof(mk('xwing', cells, keyOf(cells, bit(d)), e, null,
+          'Sur les ' + (t === 0 ? 'lignes ' : 'colonnes ') + (a + 1) + ' et ' + (b + 1) + ', le ' + d + ' n’a que deux places, alignées sur les mêmes ' + (t === 0 ? 'colonnes ' : 'lignes ') + (cover[A[0]] + 1) + ' et ' + (cover[A[1]] + 1) + '. Le ' + d + ' occupe donc forcément deux coins opposés du rectangle : on l’élimine du reste de ces ' + (t === 0 ? 'colonnes.' : 'lignes.')), pfx);
       }
     }
   }
@@ -434,7 +440,9 @@ var SE = (function () {
         var e = elimFrom(c, commonPeers(w1, w2), z1, [piv]);
         if (e.length) {
           var key = {}; key[piv] = c[piv]; key[w1] = c[w1]; key[w2] = c[w2];
-          yield mk('xywing', [piv, w1, w2], key, e, null, 'Pivot ' + name(piv) + ' {' + ab.join(',') + '}, pinces ' + name(w1) + ' {' + digits(c[w1]).join(',') + '} et ' + name(w2) + ' {' + digits(c[w2]).join(',') + '}. Quel que soit le chiffre du pivot, l’une des deux pinces vaut ' + z + ' : toute case qui voit les deux pinces ne peut pas contenir ' + z + '.');
+          var ty = e[0][0], a1 = digits(sh1)[0], b2 = digits(sh2)[0];
+          var py = 'Pour le vérifier en mode Hypothèse : pose un ' + z + ' en ' + name(ty) + '. Les deux pinces voient cette case et perdent le ' + z + ' : ' + name(w1) + ' devient ' + a1 + ' et ' + name(w2) + ' devient ' + b2 + '. Le pivot ' + name(piv) + ' voit les deux pinces : il ne peut plus valoir ni ' + a1 + ' ni ' + b2 + ', il n\u2019a plus aucun candidat. Contradiction.';
+          yield withProof(mk('xywing', [piv, w1, w2], key, e, null, 'Pivot ' + name(piv) + ' {' + ab.join(',') + '}, pinces ' + name(w1) + ' {' + digits(c[w1]).join(',') + '} et ' + name(w2) + ' {' + digits(c[w2]).join(',') + '}. Quel que soit le chiffre du pivot, l’une des deux pinces vaut ' + z + ' : toute case qui voit les deux pinces ne peut pas contenir ' + z + '.'), py);
         }
       }
     }
@@ -457,7 +465,9 @@ var SE = (function () {
           if (!ok) continue;
           var e = elimFrom(c, targets, bit(el));
           var key = {}; key[A] = c[A]; key[B] = c[B]; key[L1] = bit(lk); key[L2] = bit(lk);
-          yield mk('wwing', [A, B, L1, L2], key, e, null, 'Les cases ' + name(A) + ' et ' + name(B) + ' contiennent toutes deux {' + ds.join(',') + '}. Dans la ' + unitName(u) + ', le ' + lk + ' n’a que deux places (' + name(L1) + ' et ' + name(L2) + '), et chacune voit l’une des deux cases. L’une de ' + name(A) + ' ou ' + name(B) + ' vaut donc forcément ' + el + ' : on élimine ' + el + ' des cases qui voient les deux.');
+          var tw = e[0][0];
+          var pw = 'Pour le vérifier en mode Hypothèse : pose un ' + el + ' en ' + name(tw) + '. Cette case voit ' + name(A) + ' et ' + name(B) + ', qui perdent le ' + el + ' et deviennent toutes les deux ' + lk + '. Alors ' + name(L1) + ' (qui voit ' + name(A) + ') et ' + name(L2) + ' (qui voit ' + name(B) + ') perdent le ' + lk + ' : ' + laUnit(u) + ' n\u2019a plus aucune place pour le ' + lk + '. La contradiction ne se voit pas comme une case vide : regarde où le ' + lk + ' peut encore aller dans ' + laUnit(u) + '.';
+          yield withProof(mk('wwing', [A, B, L1, L2], key, e, null, 'Les cases ' + name(A) + ' et ' + name(B) + ' contiennent toutes deux {' + ds.join(',') + '}. Dans ' + laUnit(u) + ', le ' + lk + ' n’a que deux places (' + name(L1) + ' et ' + name(L2) + '), et chacune voit l’une des deux cases. L’une de ' + name(A) + ' ou ' + name(B) + ' vaut donc forcément ' + el + ' : on élimine ' + el + ' des cases qui voient les deux.'), pw);
         }
       }
     }
@@ -784,7 +794,7 @@ if (typeof module !== 'undefined') module.exports = SE;
     else {
       var lvl = st.level === 3 ? 'Technique avancée' : st.level === 2 ? 'Technique intermédiaire' : 'Technique de base';
       if (hint.stage === 1) ht.innerHTML = '<span class="label">' + lvl + '</span><b class="t">' + st.title + '</b><span>Les cases en bleu forment le motif. À toi de trouver ' + (st.place ? 'le chiffre à poser.' : 'ce qu’il élimine.') + '</span>';
-      else ht.innerHTML = '<span class="label">' + lvl + '</span><b class="t">' + st.title + '</b><span>' + st.text + '</span><span class="small">' + (st.place ? 'À poser : ' + st.place[1] + ' en ' + SE.name(st.place[0]) + '.' : 'Éliminations en rouge : ' + st.elim.map(function (e) { return e[1] + ' en ' + SE.name(e[0]); }).join(', ') + '.') + '</span>';
+      else ht.innerHTML = '<span class="label">' + lvl + '</span><b class="t">' + st.title + '</b><span>' + st.text + '</span>' + (st.proof ? '<span class="proof">' + st.proof + '</span>' : '') + '<span class="small">' + (st.place ? 'À poser : ' + st.place[1] + ' en ' + SE.name(st.place[0]) + '.' : 'Éliminations en rouge : ' + st.elim.map(function (e) { return e[1] + ' en ' + SE.name(e[0]); }).join(', ') + '.') + '</span>';
       ha.hidden = false; $('hintMore').hidden = hint.stage !== 1; $('hintApply').hidden = hint.stage !== 2;
     }
     // en-tête
