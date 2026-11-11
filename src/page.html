@@ -10,7 +10,7 @@
   --accent: #5b3fd1; --accent-soft: #ece8fd;
   --user: #5b3fd1; --hypo: #c2410c; --hypo-soft: #fff0e6;
   --hint: #1d5fe0; --hint-soft: #d6e4ff; --wrong: #cf1f3c; --wrong-soft: #ffe3e8;
-  --sel: #ffe9a8; --peer: #eef0f6; --same: #c3b4fb;
+  --empty: #eef0f7; --sel: #ffe9a8; --peer: #eef0f6; --same: #c3b4fb;
   --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
 }
@@ -18,12 +18,12 @@
   --bg: #11131a; --surface: #1a1d27; --ink: #e7e9f1; --muted: #9298ab; --line: #343947; --line-strong: #c5c9d6;
   --accent: #a593ff; --accent-soft: #2a2546; --user: #a593ff; --hypo: #ff9454; --hypo-soft: #3a2416;
   --hint: #7aa7ff; --hint-soft: #1c335e; --wrong: #ff6b81; --wrong-soft: #45202a;
-  --sel: #4b4020; --peer: #212533; --same: #463a8f; color-scheme: dark; } }
+  --empty: #2e3344; --sel: #4b4020; --peer: #212533; --same: #463a8f; color-scheme: dark; } }
 :root[data-theme="dark"] {
   --bg: #11131a; --surface: #1a1d27; --ink: #e7e9f1; --muted: #9298ab; --line: #343947; --line-strong: #c5c9d6;
   --accent: #a593ff; --accent-soft: #2a2546; --user: #a593ff; --hypo: #ff9454; --hypo-soft: #3a2416;
   --hint: #7aa7ff; --hint-soft: #1c335e; --wrong: #ff6b81; --wrong-soft: #45202a;
-  --sel: #4b4020; --peer: #212533; --same: #463a8f; color-scheme: dark; }
+  --empty: #2e3344; --sel: #4b4020; --peer: #212533; --same: #463a8f; color-scheme: dark; }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { background: var(--bg); color: var(--ink); }
@@ -44,6 +44,7 @@ h1 span { color: var(--accent); }
   font-size: clamp(20px, 5.4vw, 32px); font-weight: 500; color: var(--user); background: var(--surface); transition: background-color .12s; min-width: 0; min-height: 0; }
 .cell.c8 { border-right: none; } .cell.r8 { border-bottom: none; }
 .cell.bR { border-right: 2.5px solid var(--line-strong); } .cell.bB { border-bottom: 2.5px solid var(--line-strong); }
+.cell.empty { background: var(--empty); }
 .cell.peer { background: var(--peer); }
 .cell.same { background: var(--same); }
 .cell.sel { background: var(--sel); }
@@ -55,7 +56,7 @@ h1 span { color: var(--accent); }
 .cell.conflict .v { text-decoration: underline wavy var(--wrong); text-underline-offset: 4px; text-decoration-thickness: 1.5px; }
 .cell.errflag { box-shadow: inset 0 0 0 2px var(--wrong); }
 .marks { position: absolute; inset: 2px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); }
-.marks span { display: grid; place-items: center; font-size: clamp(8px, 1.9vw, 12.5px); font-weight: 500; color: var(--muted); line-height: 1; border-radius: 3px; }
+.marks span { display: grid; place-items: center; font-size: clamp(9.5px, 2.7vw, 14px); font-weight: 600; color: var(--muted); line-height: 1; border-radius: 3px; }
 .marks span.ghost { opacity: .55; font-style: italic; }
 .marks span.key { color: var(--surface); background: var(--hint); font-weight: 700; opacity: 1; }
 .marks span.elim { color: var(--wrong); text-decoration: line-through; text-decoration-thickness: 2px; font-weight: 700; opacity: 1; background: var(--wrong-soft); }
@@ -440,7 +441,7 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
       if (errMap[i]) cls += ' errflag';
       if (S.training && k === 'n' && v && v !== S.solution[i]) cls += ' wrong';
       if (bad[i]) cls += ' conflict';
-      el.className = cls;
+      el.className = cls + (v ? "" : " empty");
       if (v) { el.innerHTML = '<span class="v">' + v + '</span>'; el.setAttribute('aria-label', SE.name(i) + ' : ' + v); continue; }
       var m = S.marks[i], key = stage2 && st.keyDigits[i] || 0, el2 = elimMap[i] || 0;
       var ghost = (stage2 && !m && (blue[i] || el2)) ? hint.cands[i] : 0;
