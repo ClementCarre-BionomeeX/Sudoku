@@ -6,6 +6,8 @@
 <style>
 /* Mise en page : grille à gauche, pupitre de jeu à droite ; empilés sur téléphone. */
 :root {
+  --c1: rgba(239, 68, 68, .55); --c2: rgba(249, 140, 30, .6); --c3: rgba(250, 214, 30, .6); --c4: rgba(52, 190, 90, .55); --c5: rgba(30, 200, 210, .5);
+  --c6: rgba(59, 110, 246, .5); --c7: rgba(160, 80, 230, .5); --c8: rgba(240, 100, 190, .55); --c9: rgba(130, 140, 160, .6);
   --bg: #f3f4f8; --surface: #ffffff; --ink: #1b2131; --muted: #626a80; --line: #c9cddb; --line-strong: #1b2131;
   --accent: #5b3fd1; --accent-soft: #ece8fd;
   --user: #5b3fd1; --hypo: #c2410c; --hypo-soft: #fff0e6;
@@ -69,8 +71,8 @@ h1 span { color: var(--accent); }
 .console { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 10px; align-items: stretch; }
 .console.flip { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
 .console.flip .pad { order: 2; }
-.tools { display: grid; grid-template-rows: 3fr 1fr; gap: 6px; min-width: 0; }
-.modes { display: grid; grid-template-rows: repeat(3, 1fr); gap: 6px; }
+.tools { display: grid; grid-template-rows: 4fr 1fr; gap: 6px; min-width: 0; }
+.modes { display: grid; grid-template-rows: repeat(4, 1fr); gap: 6px; }
 .mode { align-content: center; }
 .mode.erase { font-size: 20px; }
 .mode { border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 9px 6px; font: 600 14px var(--body); cursor: pointer; display: grid; gap: 2px; justify-items: center; }
@@ -91,6 +93,11 @@ h1 span { color: var(--accent); }
 .pad button.erase { font-size: 20px; }
 .pad.m button:not(.erase) { font-size: 15px; color: var(--muted); }
 .pad.h button:not(.erase) { color: var(--hypo); font-style: italic; }
+.pad.c button { color: transparent; }
+.pad.c button small { display: none; }
+.pad.c button.active { box-shadow: inset 0 0 0 3px var(--ink), 0 0 0 2px var(--ink); color: transparent; }
+.mode.c[aria-pressed="true"] { border-color: var(--ink); background: var(--peer); color: var(--ink); }
+.mode.c .dots { display: inline-block; width: 26px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #ef4444 0 33%, #facc15 33% 66%, #3b6ef6 66%); }
 button { -webkit-tap-highlight-color: transparent; }
 button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -158,6 +165,7 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
           <button class="mode" data-mode="n" id="modeN">Nombre<small>touche N</small></button>
           <button class="mode" data-mode="m" id="modeM">Marque<small>touche M</small></button>
           <button class="mode h" data-mode="h" id="modeH">Hypothèse<small>touche H</small></button>
+          <button class="mode c" data-mode="c" id="modeC">Couleur<small><span class="dots"></span></small></button>
         </div>
             <button class="mode erase" id="eraseBtn" title="Effacer (Suppr)">⌫<small>Effacer</small></button>
           </div>
@@ -166,6 +174,7 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
           <button class="btn" id="undo" title="Ctrl+Z">Annuler</button>
           <button class="btn" id="autoMarks">Marques auto</button>
           <button class="btn" id="clearMarks">Effacer les marques</button>
+          <button class="btn" id="clearColors">Effacer les couleurs</button>
           <button class="btn" id="flipBtn" title="Mettre le pavé de l'autre côté">⇄ Inverser</button>
         </div>
         <label class="check"><input type="checkbox" id="gestureChk"> Choisir le chiffre d'abord, puis toucher les cases</label>
@@ -223,6 +232,7 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
         <ul>
           <li><kbd>1</kbd>–<kbd>9</kbd> pose dans le mode actif, <kbd>Maj</kbd>+chiffre pose une marque.</li>
           <li>Appui long sur une case : pose une marque en mode Nombre ou Hypothèse, et un nombre en mode Marque.</li>
+          <li>Mode Couleur (<kbd>C</kbd>) : le pavé devient 9 couleurs, une case peut en avoir plusieurs ; ⌫ efface les couleurs d'une case.</li>
           <li><kbd>N</kbd> <kbd>M</kbd> <kbd>H</kbd> changent de mode, <kbd>Suppr</kbd> efface, flèches pour bouger.</li>
           <li><kbd>?</kbd> indice, <kbd>Ctrl</kbd>+<kbd>Z</kbd> annule, <kbd>Échap</kbd> ferme l'indice.</li>
           <li>X-Wing : un chiffre limité à deux places sur deux lignes, alignées sur les mêmes colonnes.</li>
@@ -250,11 +260,11 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
 
   /* ---------- état ---------- */
   function newState(puzzle, solution, level) {
-    return { givens: puzzle.slice(), vals: puzzle.slice(), kind: puzzle.map(function (v) { return v ? 'g' : ''; }), marks: new Array(81).fill(0),
+    return { givens: puzzle.slice(), vals: puzzle.slice(), kind: puzzle.map(function (v) { return v ? 'g' : ''; }), marks: new Array(81).fill(0), colors: new Array(81).fill(0),
       solution: solution, level: level, mode: 'n', sel: -1, training: false, advOnly: false, hypo: null, elapsed: 0, won: false };
   }
-  function snap() { return { vals: S.vals.slice(), kind: S.kind.slice(), marks: S.marks.slice(), hypo: S.hypo }; }
-  function restore(s) { S.vals = s.vals.slice(); S.kind = s.kind.slice(); S.marks = s.marks.slice(); S.hypo = s.hypo; }
+  function snap() { return { vals: S.vals.slice(), kind: S.kind.slice(), marks: S.marks.slice(), colors: S.colors.slice(), hypo: S.hypo }; }
+  function restore(s) { S.vals = s.vals.slice(); S.kind = s.kind.slice(); S.marks = s.marks.slice(); if (s.colors) S.colors = s.colors.slice(); S.hypo = s.hypo; }
   function pushUndo() { undoStack.push(snap()); if (undoStack.length > 300) undoStack.shift(); }
   function save() { try { localStorage.setItem('sudoku-entrainement', JSON.stringify(S)); } catch (e) {} }
   function load() { try { var s = JSON.parse(localStorage.getItem('sudoku-entrainement')); if (s && s.vals && s.vals.length === 81 && s.solution) return s; } catch (e) {} return null; }
@@ -278,6 +288,7 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
     pushUndo(); S.marks[i] ^= bit(d); changed();
   }
   function erase(i) {
+    if (S.mode === 'c') { clearColorAt(i); return; }
     if (i < 0 || S.kind[i] === 'g') return;
     pushUndo();
     if (S.vals[i]) { S.vals[i] = 0; S.kind[i] = ''; } else S.marks[i] = 0;
@@ -286,6 +297,7 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
   /* appui long : fait l'inverse du mode (Marque -> nombre, Nombre/Hypothèse -> marque) */
   function inputAlt(d) {
     if (S.sel < 0) return;
+    if (S.mode === 'c') { toggleColor(S.sel, d); return; }
     if (S.mode === 'm') placeNumber(S.sel, d, false);
     else { if (S.vals[S.sel]) return; toggleMark(S.sel, d); }
   }
@@ -315,6 +327,7 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
   }
   function input(d) {
     if (S.sel < 0) return;
+    if (S.mode === 'c') { toggleColor(S.sel, d); return; }
     if (S.mode === 'm' || shiftHeld) toggleMark(S.sel, d);
     else placeNumber(S.sel, d, S.mode === 'h');
   }
@@ -322,6 +335,9 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
   function cancelHypo() { if (!S.hypo) return; pushUndo(); restore(S.hypo.snap); S.hypo = null; changed(); }
   function keepHypo() { if (!S.hypo) return; pushUndo(); for (var i = 0; i < 81; i++) if (S.kind[i] === 'h') S.kind[i] = 'n'; S.hypo = null; changed(); }
   function autoMarks() { pushUndo(); var c = SE.computeCands(S.vals); for (var i = 0; i < 81; i++) S.marks[i] = S.vals[i] ? 0 : c[i]; changed(); }
+  function toggleColor(i, c) { if (i < 0) return; pushUndo(); S.colors[i] ^= (1 << (c - 1)); changed(); }
+  function clearColorAt(i) { if (i < 0 || !S.colors[i]) return; pushUndo(); S.colors[i] = 0; changed(); }
+  function clearColors() { pushUndo(); S.colors.fill(0); changed(); }
   function clearMarks() { pushUndo(); S.marks.fill(0); changed(); }
   function changed(keepHint) {
     if (hint && !keepHint) closeHint(true);
@@ -396,6 +412,7 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
       var i = +t.dataset.i;
       if (gesture === 'digit') {
         if (ad === 0) { S.sel = i; erase(i); return; }
+        if (S.mode === 'c') { S.sel = i; if (ad > 0) toggleColor(i, ad); else render(); return; }
         var alt = long && ad > 0 && S.kind[i] !== 'g';
         if (alt) { S.sel = i; inputAlt(ad); return; }
         if (ad > 0 && S.kind[i] !== 'g' && !(S.vals[i] && S.vals[i] !== ad && S.mode === 'm')) { S.sel = i; input(ad); return; }
@@ -426,7 +443,7 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
     return bad;
   }
   function render() {
-    var dg = gesture === 'digit', bad = conflicts(), sel = S.sel, selV = dg ? (ad > 0 ? ad : 0) : (sel >= 0 ? S.vals[sel] : 0);
+    var dg = gesture === 'digit', cm = S.mode === 'c', bad = conflicts(), sel = S.sel, selV = cm ? (sel >= 0 && !dg ? S.vals[sel] : 0) : dg ? (ad > 0 ? ad : 0) : (sel >= 0 ? S.vals[sel] : 0);
     var st = hint && hint.step, stage2 = st && hint.stage === 2;
     var blue = {}, elimMap = {}, errMap = {};
     if (st) st.cells.forEach(function (c) { blue[c] = true; });
@@ -443,6 +460,7 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
       if (S.training && k === 'n' && v && v !== S.solution[i]) cls += ' wrong';
       if (bad[i]) cls += ' conflict';
       el.className = cls + (v ? "" : " empty");
+      el.style.backgroundImage = colorBg(S.colors[i]);
       if (v) { el.innerHTML = '<span class="v">' + v + '</span>'; el.setAttribute('aria-label', SE.name(i) + ' : ' + v); continue; }
       var m = S.marks[i], key = stage2 && st.keyDigits[i] || 0, el2 = elimMap[i] || 0;
       var ghost = (stage2 && !m && (blue[i] || el2)) ? hint.cands[i] : 0;
@@ -469,8 +487,10 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
       b.querySelector('small').textContent = 9 - counts[d] > 0 ? 9 - counts[d] : '';
       b.classList.toggle('done', counts[d] >= 9);
       b.classList.toggle('active', dg && ad === d);
+      b.style.background = cm ? 'linear-gradient(var(--c' + d + '), var(--c' + d + ')), var(--surface)' : '';
+      if (cm) b.classList.remove('done');
     });
-    ['n', 'm', 'h'].forEach(function (md) { $('mode' + md.toUpperCase()).setAttribute('aria-pressed', S.mode === md ? 'true' : 'false'); });
+    ['n', 'm', 'h', 'c'].forEach(function (md) { $('mode' + md.toUpperCase()).setAttribute('aria-pressed', S.mode === md ? 'true' : 'false'); });
     $('eraseBtn').classList.toggle('active', dg && ad === 0); $('gestureChk').checked = dg;
     $('training').checked = S.training; $('advOnly').checked = S.advOnly;
     $('undo').disabled = !undoStack.length;
@@ -491,6 +511,13 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
     $('levelPill').textContent = LEVEL_LABEL[S.level] || S.level;
     $('win').hidden = !S.won;
     if (S.won) $('win').textContent = 'Grille terminée en ' + fmt(S.elapsed) + '. Bravo !';
+  }
+  function colorBg(m) {
+    if (!m) return '';
+    var cs = []; for (var c = 1; c <= 9; c++) if (m & (1 << (c - 1))) cs.push('var(--c' + c + ')');
+    if (cs.length === 1) return 'linear-gradient(' + cs[0] + ', ' + cs[0] + ')';
+    var step = 360 / cs.length, parts = cs.map(function (c, k) { return c + ' ' + (k * step) + 'deg ' + ((k + 1) * step) + 'deg'; });
+    return 'conic-gradient(from 45deg, ' + parts.join(', ') + ')';
   }
   function fmt(s) { var m = Math.floor(s / 60); return (m < 10 ? '0' : '') + m + ':' + ((s % 60) < 10 ? '0' : '') + (s % 60); }
 
@@ -525,14 +552,14 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
   }
 
   /* ---------- évènements ---------- */
-  function setMode(m) { S.mode = m; render(); save(); }
+  function setMode(m) { if ((m === 'c') !== (S.mode === 'c')) ad = -1; S.mode = m; render(); save(); }
   document.querySelectorAll('.mode[data-mode]').forEach(function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode); }); });
   function applyFlip(f) { $('console').classList.toggle('flip', f); try { localStorage.setItem('sudoku-flip', f ? '1' : '0'); } catch (e) {} }
   var flip = true; try { flip = localStorage.getItem('sudoku-flip') !== '0'; } catch (e) {}
   applyFlip(flip);
   $('flipBtn').onclick = function () { flip = !flip; applyFlip(flip); };
   $('undo').onclick = undo; $('eraseBtn').onclick = function () { if (gesture === 'digit') { ad = (ad === 0 ? -1 : 0); render(); } else erase(S.sel); };
-  $('gestureChk').onchange = function () { gesture = this.checked ? 'digit' : 'cell'; ad = -1; try { localStorage.setItem('sudoku-gesture', gesture); } catch (e) {} render(); }; $('autoMarks').onclick = autoMarks; $('clearMarks').onclick = clearMarks;
+  $('gestureChk').onchange = function () { gesture = this.checked ? 'digit' : 'cell'; ad = -1; try { localStorage.setItem('sudoku-gesture', gesture); } catch (e) {} render(); }; $('autoMarks').onclick = autoMarks; $('clearMarks').onclick = clearMarks; $('clearColors').onclick = clearColors;
   $('hypoCancel').onclick = cancelHypo; $('hypoKeep').onclick = keepHypo;
   $('ask').onclick = askHint; $('hintMore').onclick = function () { if (hint) { hint.stage = 2; render(); } };
   $('hintApply').onclick = applyHint; $('hintClose').onclick = function () { closeHint(); };
@@ -552,7 +579,7 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
     if (d > 0) { e.preventDefault(); input(d); shiftHeld = false; return; }
     if (d === 0 || e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); erase(S.sel); return; }
     var k = e.key.toLowerCase();
-    if (k === 'n' || k === 'm' || k === 'h') { setMode(k); return; }
+    if (k === 'n' || k === 'm' || k === 'h' || k === 'c') { setMode(k); return; }
     if (e.key === 'Escape') { if (hint) closeHint(); else { S.sel = -1; render(); } return; }
     var mv = { ArrowUp: -9, ArrowDown: 9, ArrowLeft: -1, ArrowRight: 1 }[e.key];
     if (mv) {
@@ -573,7 +600,7 @@ kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-w
   /* ---------- démarrage ---------- */
   buildBoard(); buildPad();
   var saved = load();
-  if (saved) { S = saved; S.sel = -1; render(); $('timer').textContent = fmt(S.elapsed); }
+  if (saved) { S = saved; S.sel = -1; if (!S.colors) S.colors = new Array(81).fill(0); render(); $('timer').textContent = fmt(S.elapsed); }
   else {
     $('level').value = 'xwing';
     var pz = SE.generate('xwing', 0, 3000);
