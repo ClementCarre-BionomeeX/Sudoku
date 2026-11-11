@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<title>Sudoku d'entraînement</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5b3fd1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sudoku">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+html, body { margin: 0; } [hidden] { display: none !important; }
+</style>
+
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Mise en page : grille à gauche, pupitre de jeu à droite ; empilés sur téléphone. */
+:root {
+  --bg: #f3f4f8; --surface: #ffffff; --ink: #1b2131; --muted: #626a80; --line: #c9cddb; --line-strong: #1b2131;
+  --accent: #5b3fd1; --accent-soft: #ece8fd;
+  --user: #5b3fd1; --hypo: #c2410c; --hypo-soft: #fff0e6;
+  --hint: #1d5fe0; --hint-soft: #d6e4ff; --wrong: #cf1f3c; --wrong-soft: #ffe3e8;
+  --sel: #ffe9a8; --peer: #eef0f6; --same: #c3b4fb;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11131a; --surface: #1a1d27; --ink: #e7e9f1; --muted: #9298ab; --line: #343947; --line-strong: #c5c9d6;
+  --accent: #a593ff; --accent-soft: #2a2546; --user: #a593ff; --hypo: #ff9454; --hypo-soft: #3a2416;
+  --hint: #7aa7ff; --hint-soft: #1c335e; --wrong: #ff6b81; --wrong-soft: #45202a;
+  --sel: #4b4020; --peer: #212533; --same: #463a8f; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #11131a; --surface: #1a1d27; --ink: #e7e9f1; --muted: #9298ab; --line: #343947; --line-strong: #c5c9d6;
+  --accent: #a593ff; --accent-soft: #2a2546; --user: #a593ff; --hypo: #ff9454; --hypo-soft: #3a2416;
+  --hint: #7aa7ff; --hint-soft: #1c335e; --wrong: #ff6b81; --wrong-soft: #45202a;
+  --sel: #4b4020; --peer: #212533; --same: #463a8f; color-scheme: dark; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--bg); color: var(--ink); }
+body { font-family: var(--body); font-size: 15px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+.wrap { max-width: 1040px; margin: 0 auto; display: grid; gap: 18px; }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(26px, 4vw, 34px); letter-spacing: -0.02em; margin: 0; }
+h1 span { color: var(--accent); }
+.meta { display: flex; gap: 14px; align-items: center; color: var(--muted); font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+.pill { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; padding: 3px 9px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+.game { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 820px) { .game { grid-template-columns: minmax(0, 1fr); } }
+
+/* --- grille --- */
+.board { width: 100%; max-width: 560px; aspect-ratio: 1; display: grid; grid-template-columns: repeat(9, 1fr); grid-template-rows: repeat(9, 1fr);
+  border: 2.5px solid var(--line-strong); border-radius: 6px; overflow: hidden; background: var(--surface); user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+.cell { position: relative; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: grid; place-items: center; cursor: pointer;
+  font-size: clamp(20px, 5.4vw, 32px); font-weight: 500; color: var(--user); background: var(--surface); transition: background-color .12s; min-width: 0; min-height: 0; }
+.cell.c8 { border-right: none; } .cell.r8 { border-bottom: none; }
+.cell.bR { border-right: 2.5px solid var(--line-strong); } .cell.bB { border-bottom: 2.5px solid var(--line-strong); }
+.cell.peer { background: var(--peer); }
+.cell.same { background: var(--same); }
+.cell.sel { background: var(--sel); }
+.cell.hint { background: var(--hint-soft); box-shadow: inset 0 0 0 2px var(--hint); }
+.cell.given { color: var(--ink); font-weight: 700; }
+.cell.hypo { color: var(--hypo); font-style: italic; }
+.cell.hypo.origin::after { content: ""; position: absolute; inset: 3px; border: 2px dashed var(--hypo); border-radius: 50%; pointer-events: none; }
+.cell.wrong { color: var(--wrong); background: var(--wrong-soft); }
+.cell.conflict .v { text-decoration: underline wavy var(--wrong); text-underline-offset: 4px; text-decoration-thickness: 1.5px; }
+.cell.errflag { box-shadow: inset 0 0 0 2px var(--wrong); }
+.marks { position: absolute; inset: 2px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); }
+.marks span { display: grid; place-items: center; font-size: clamp(8px, 1.9vw, 12.5px); font-weight: 500; color: var(--muted); line-height: 1; border-radius: 3px; }
+.marks span.ghost { opacity: .55; font-style: italic; }
+.marks span.key { color: var(--surface); background: var(--hint); font-weight: 700; opacity: 1; }
+.marks span.elim { color: var(--wrong); text-decoration: line-through; text-decoration-thickness: 2px; font-weight: 700; opacity: 1; background: var(--wrong-soft); }
+.cell:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+
+/* --- pupitre --- */
+.side { display: grid; gap: 16px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 12px; }
+.label { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; color: var(--muted); }
+.console { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 10px; align-items: stretch; }
+.console.flip { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+.console.flip .pad { order: 2; }
+.tools { display: grid; grid-template-rows: 3fr 1fr; gap: 6px; min-width: 0; }
+.modes { display: grid; grid-template-rows: repeat(3, 1fr); gap: 6px; }
+.mode { align-content: center; }
+.mode.erase { font-size: 20px; }
+.mode { border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 9px 6px; font: 600 14px var(--body); cursor: pointer; display: grid; gap: 2px; justify-items: center; }
+.mode small { font-weight: 500; font-size: 11px; color: var(--muted); }
+.mode[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.mode.h[aria-pressed="true"] { border-color: var(--hypo); background: var(--hypo-soft); color: var(--hypo); }
+.pad { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 1fr; gap: 6px; }
+.pad button { position: relative; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; min-height: 50px; font: 600 24px var(--body); cursor: pointer; font-variant-numeric: tabular-nums; }
+.pad button small { position: absolute; top: 3px; right: 6px; font-size: 10px; font-weight: 500; color: var(--muted); }
+.pad button.done { opacity: .35; }
+.pad button.active, .mode.erase.active { background: var(--accent); border-color: var(--accent); color: var(--surface); opacity: 1; }
+.pad.h button.active { background: var(--hypo); border-color: var(--hypo); color: var(--surface); }
+.pad button.active small, .mode.erase.active small { color: var(--surface); }
+.pad.m button.active:not(.erase), .pad.h button.active:not(.erase) { color: var(--surface); }
+.marks span.hl { background: var(--accent); color: var(--surface); font-weight: 700; }
+.pad button.erase { font-size: 20px; }
+.pad.m button:not(.erase) { font-size: 15px; color: var(--muted); }
+.pad.h button:not(.erase) { color: var(--hypo); font-style: italic; }
+button { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 8px 12px; font: 500 14px var(--body); cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 600; }
+.btn:disabled { opacity: .45; cursor: default; }
+.ask { width: 50px; height: 50px; border-radius: 50%; border: none; background: var(--hint); color: var(--surface); font: 800 26px var(--display); cursor: pointer; flex: none; box-shadow: 0 2px 0 rgba(0,0,0,.15); }
+.ask:hover { filter: brightness(1.08); }
+.hintbox { display: flex; gap: 12px; align-items: flex-start; }
+.hinttext { display: grid; gap: 6px; min-width: 0; font-size: 14px; line-height: 1.45; }
+.hinttext b.t { font-family: var(--display); font-size: 18px; font-weight: 600; color: var(--hint); }
+.hinttext .err { color: var(--wrong); }
+.check { display: flex; gap: 8px; align-items: center; cursor: pointer; font-size: 14px; }
+.check input { width: 17px; height: 17px; accent-color: var(--accent); }
+.hypobar { border-color: var(--hypo); background: var(--hypo-soft); }
+.hypobar p { margin: 0; font-size: 14px; line-height: 1.45; }
+.hypobar .btn.primary { background: var(--hypo); border-color: var(--hypo); }
+select, input[type=text] { font: 500 14px var(--body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+input[type=text] { flex: 1 1 180px; font-variant-numeric: tabular-nums; }
+.win { background: var(--accent); color: var(--surface); border-radius: 10px; padding: 14px 16px; font-weight: 600; }
+.small { font-size: 13px; color: var(--muted); line-height: 1.45; margin: 0; }
+details summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+details ul { margin: 8px 0 0; padding-left: 18px; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
+kbd { font: 600 11px var(--body); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; color: var(--ink); }
+/* sur téléphone : modes et chiffres collés sous la grille, compacts */
+.board { max-width: min(560px, calc(100vh - 120px)); }
+@media (max-width: 820px) {
+  body { padding-block: 10px 30px; }
+  .wrap { gap: 10px; }
+  .game { gap: 10px; }
+  .board { max-width: min(100%, calc(100vh - 250px)); margin: 0 auto; }
+  .side { gap: 10px; }
+  .controls { padding: 8px; gap: 8px; }
+  .mode { padding: 6px 4px; }
+  .mode small { display: none; }
+  .modes, .tools { gap: 5px; }
+  .pad { gap: 5px; }
+  .console { gap: 8px; }
+  .pad button { min-height: 46px; font-size: 22px; padding: 0; }
+  .pad button small { top: 1px; right: 3px; font-size: 9px; }
+  .pad button.erase { font-size: 18px; }
+  .controls .btn { padding: 6px 10px; font-size: 13px; }
+  h1 { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) { .cell { transition: none; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Sudoku <span>d'entraînement</span></h1>
+    <div class="meta"><span class="pill" id="levelPill">—</span><span id="timer">00:00</span></div>
+  </header>
+
+  <div class="game">
+    <div class="board" id="board" role="grid" aria-label="Grille de sudoku"></div>
+
+    <div class="side">
+      <div class="panel controls">
+        <div class="console" id="console">
+          <div class="pad" id="pad"></div>
+          <div class="tools">
+            <div class="modes" role="group" aria-label="Mode de saisie">
+          <button class="mode" data-mode="n" id="modeN">Nombre<small>touche N</small></button>
+          <button class="mode" data-mode="m" id="modeM">Marque<small>touche M</small></button>
+          <button class="mode h" data-mode="h" id="modeH">Hypothèse<small>touche H</small></button>
+        </div>
+            <button class="mode erase" id="eraseBtn" title="Effacer (Suppr)">⌫<small>Effacer</small></button>
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn" id="undo" title="Ctrl+Z">Annuler</button>
+          <button class="btn" id="autoMarks">Marques auto</button>
+          <button class="btn" id="clearMarks">Effacer les marques</button>
+          <button class="btn" id="flipBtn" title="Mettre le pavé de l'autre côté">⇄ Inverser</button>
+        </div>
+        <label class="check"><input type="checkbox" id="gestureChk"> Choisir le chiffre d'abord, puis toucher les cases</label>
+        <label class="check"><input type="checkbox" id="training"> Training : les chiffres faux s'affichent en rouge</label>
+      </div>
+
+      <div class="panel hypobar" id="hypobar" hidden>
+        <p><b>Hypothèse en cours</b> depuis <span id="hypoOrigin"></span>. Tout ce que tu poses depuis sera annulé d'un clic.</p>
+        <div class="row">
+          <button class="btn primary" id="hypoCancel">Annuler la chaîne</button>
+          <button class="btn" id="hypoKeep">Garder les chiffres</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hintbox">
+          <button class="ask" id="ask" title="Prochaine technique (touche ?)" aria-label="Indice">?</button>
+          <div class="hinttext" id="hinttext">
+            <span class="small">Le bouton cherche la prochaine technique à trouver et entoure les cases concernées en bleu. Un second clic montre l'élimination.</span>
+          </div>
+        </div>
+        <div class="row" id="hintActions" hidden>
+          <button class="btn" id="hintMore">Montrer l'élimination</button>
+          <button class="btn primary" id="hintApply" hidden>Appliquer</button>
+          <button class="btn" id="hintClose">Fermer</button>
+        </div>
+        <label class="check"><input type="checkbox" id="advOnly"> Chercher seulement X-Wing, XY-Wing et W-Wing</label>
+      </div>
+
+      <div class="win" id="win" hidden></div>
+
+      <div class="panel">
+        <div class="label">Nouvelle grille</div>
+        <div class="row">
+          <select id="level" aria-label="Niveau">
+            <option value="facile">Facile (singletons)</option>
+            <option value="moyen">Moyen (paires, pointages)</option>
+            <option value="difficile">Difficile (X/XY/W-Wing)</option>
+            <option value="xwing">Entraînement X-Wing</option>
+            <option value="xywing">Entraînement XY-Wing</option>
+            <option value="wwing">Entraînement W-Wing</option>
+          </select>
+          <button class="btn primary" id="newGame">Générer</button>
+          <button class="btn" id="restart">Recommencer</button>
+        </div>
+        <div class="row">
+          <input type="text" id="importTxt" placeholder="Coller 81 chiffres (0 ou . = vide)" aria-label="Grille à importer">
+          <button class="btn" id="importBtn">Importer</button>
+        </div>
+        <p class="small" id="genMsg"></p>
+      </div>
+
+      <details class="panel">
+        <summary>Raccourcis et rappels</summary>
+        <ul>
+          <li><kbd>1</kbd>–<kbd>9</kbd> pose dans le mode actif, <kbd>Maj</kbd>+chiffre pose une marque.</li>
+          <li><kbd>N</kbd> <kbd>M</kbd> <kbd>H</kbd> changent de mode, <kbd>Suppr</kbd> efface, flèches pour bouger.</li>
+          <li><kbd>?</kbd> indice, <kbd>Ctrl</kbd>+<kbd>Z</kbd> annule, <kbd>Échap</kbd> ferme l'indice.</li>
+          <li>X-Wing : un chiffre limité à deux places sur deux lignes, alignées sur les mêmes colonnes.</li>
+          <li>XY-Wing : un pivot {A,B} voit deux pinces {A,C} et {B,C} ; C disparaît des cases qui voient les deux pinces.</li>
+          <li>W-Wing : deux cases {A,B} identiques reliées par un lien fort sur A ; B disparaît des cases qui voient les deux.</li>
+          <li>L'aide utilise tes marques quand une case en a, sinon tous les candidats possibles.</li>
+        </ul>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script id="engineSrc">
+/* ===== Moteur Sudoku : solveur, générateur, techniques ===== */
+var SE = (function () {
+  var ROW = [], COL = [], BOX = [], UNITS = [], PEERS = [], SEES = [];
+  for (var i = 0; i < 81; i++) { ROW[i] = Math.floor(i / 9); COL[i] = i % 9; BOX[i] = Math.floor(ROW[i] / 3) * 3 + Math.floor(COL[i] / 3); }
+  for (var u = 0; u < 27; u++) UNITS.push([]);
+  for (i = 0; i < 81; i++) { UNITS[ROW[i]].push(i); UNITS[9 + COL[i]].push(i); UNITS[18 + BOX[i]].push(i); }
+  for (i = 0; i < 81; i++) {
+    PEERS[i] = []; SEES[i] = new Array(81).fill(false);
+    for (var j = 0; j < 81; j++) if (j !== i && (ROW[i] === ROW[j] || COL[i] === COL[j] || BOX[i] === BOX[j])) { PEERS[i].push(j); SEES[i][j] = true; }
+  }
+  var ALL = 511;
+  function bit(d) { return 1 << (d - 1); }
+  function pc(m) { var c = 0; while (m) { m &= m - 1; c++; } return c; }
+  function digits(m) { var r = []; for (var d = 1; d <= 9; d++) if (m & bit(d)) r.push(d); return r; }
+  function name(i) { return 'L' + (ROW[i] + 1) + 'C' + (COL[i] + 1); }
+  function unitName(u) { return u < 9 ? 'ligne ' + (u + 1) : u < 18 ? 'colonne ' + (u - 8) : 'bloc ' + (u - 17); }
+  function shuffle(a, rnd) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rnd() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+  /* ---- solveur par retour arrière (compte jusqu'à limit solutions) ---- */
+  function solve(grid, limit, rnd) {
+    var g = grid.slice(), rows = [0,0,0,0,0,0,0,0,0], cols = rows.slice(), boxes = rows.slice();
+    for (var i = 0; i < 81; i++) if (g[i]) {
+      var b = bit(g[i]);
+      if ((rows[ROW[i]] | cols[COL[i]] | boxes[BOX[i]]) & b) return { count: 0 };
+      rows[ROW[i]] |= b; cols[COL[i]] |= b; boxes[BOX[i]] |= b;
+    }
+    var count = 0, first = null;
+    function rec() {
+      var best = -1, bestM = 0, bestN = 10;
+      for (var i = 0; i < 81; i++) if (!g[i]) {
+        var m = ALL & ~(rows[ROW[i]] | cols[COL[i]] | boxes[BOX[i]]), n = pc(m);
+        if (n < bestN) { best = i; bestM = m; bestN = n; if (n <= 1) break; }
+      }
+      if (best < 0) { count++; if (!first) first = g.slice(); return count >= limit; }
+      if (bestN === 0) return false;
+      var ds = digits(bestM); if (rnd) shuffle(ds, rnd);
+      for (var k = 0; k < ds.length; k++) {
+        var d = ds[k], b = bit(d);
+        g[best] = d; rows[ROW[best]] |= b; cols[COL[best]] |= b; boxes[BOX[best]] |= b;
+        if (rec()) return true;
+        rows[ROW[best]] &= ~b; cols[COL[best]] &= ~b; boxes[BOX[best]] &= ~b;
+      }
+      g[best] = 0; return false;
+    }
+    rec();
+    return { count: count, solution: first };
+  }
+
+  /* ---- candidats à partir des valeurs posées ---- */
+  function computeCands(vals) {
+    var c = new Array(81);
+    for (var i = 0; i < 81; i++) {
+      if (vals[i]) { c[i] = 0; continue; }
+      var m = ALL; var P = PEERS[i];
+      for (var k = 0; k < P.length; k++) if (vals[P[k]]) m &= ~bit(vals[P[k]]);
+      c[i] = m;
+    }
+    return c;
+  }
+
+  /* ---- techniques ----
+     Chaque étape : {tech, level, title, cells:[bleues], keyDigits:{cell:mask}, elim:[[cell,digit]], place:[cell,digit]|null, text} */
+  var TECH_NAMES = { nsingle: 'Singleton nu', hsingle: 'Singleton caché', pointing: 'Candidats bloqués (pointage)', claiming: 'Candidats bloqués (ligne/colonne)', npair: 'Paire nue', hpair: 'Paire cachée', ntriple: 'Triplet nu', xwing: 'X-Wing', xywing: 'XY-Wing', wwing: 'W-Wing' };
+  var TECH_LEVEL = { nsingle: 1, hsingle: 1, pointing: 2, claiming: 2, npair: 2, hpair: 2, ntriple: 2, xwing: 3, xywing: 3, wwing: 3 };
+
+  function mk(tech, cells, key, elim, place, text) {
+    return { tech: tech, level: TECH_LEVEL[tech], title: TECH_NAMES[tech], cells: cells, keyDigits: key || {}, elim: elim || [], place: place || null, text: text };
+  }
+  function elimFrom(cands, targets, mask, excl) {
+    var e = [];
+    for (var k = 0; k < targets.length; k++) {
+      var t = targets[k]; if (excl && excl.indexOf(t) >= 0) continue;
+      var x = cands[t] & mask; if (!x) continue;
+      var ds = digits(x); for (var q = 0; q < ds.length; q++) e.push([t, ds[q]]);
+    }
+    return e;
+  }
+  function keyOf(cells, mask) { var k = {}; cells.forEach(function (c) { k[c] = mask; }); return k; }
+  function commonPeers(a, b) { var r = []; for (var i = 0; i < 81; i++) if (i !== a && i !== b && SEES[a][i] && SEES[b][i]) r.push(i); return r; }
+
+  function* nakedSingles(v, c) {
+    for (var i = 0; i < 81; i++) if (!v[i] && pc(c[i]) === 1) {
+      var d = digits(c[i])[0];
+      yield mk('nsingle', [i], keyOf([i], c[i]), [], [i, d], 'La case ' + name(i) + ' n’a plus qu’un seul candidat possible : ' + d + '.');
+    }
+  }
+  function* hiddenSingles(v, c) {
+    for (var u = 0; u < 27; u++) for (var d = 1; d <= 9; d++) {
+      var pos = UNITS[u].filter(function (i) { return c[i] & bit(d); });
+      if (pos.length === 1 && pc(c[pos[0]]) > 1) {
+        yield mk('hsingle', UNITS[u].filter(function (i) { return !v[i]; }), keyOf(pos, bit(d)), [], [pos[0], d], 'Dans la ' + unitName(u) + ', le ' + d + ' ne peut aller qu’en ' + name(pos[0]) + '.');
+      }
+    }
+  }
+  function* locked(v, c) {
+    for (var b = 18; b < 27; b++) for (var d = 1; d <= 9; d++) {
+      var pos = UNITS[b].filter(function (i) { return c[i] & bit(d); });
+      if (pos.length < 2) continue;
+      var sameR = pos.every(function (i) { return ROW[i] === ROW[pos[0]]; }), sameC = pos.every(function (i) { return COL[i] === COL[pos[0]]; });
+      var lines = [];
+      if (sameR) lines.push(ROW[pos[0]]); if (sameC) lines.push(9 + COL[pos[0]]);
+      for (var q = 0; q < lines.length; q++) {
+        var e = elimFrom(c, UNITS[lines[q]], bit(d), pos);
+        if (e.length) yield mk('pointing', pos, keyOf(pos, bit(d)), e, null, 'Dans le ' + unitName(b) + ', le ' + d + ' est forcément sur la ' + unitName(lines[q]) + ' (cases ' + pos.map(name).join(', ') + '). On peut donc l’éliminer du reste de cette ' + (lines[q] < 9 ? 'ligne' : 'colonne') + '.');
+      }
+    }
+    for (var u = 0; u < 18; u++) for (d = 1; d <= 9; d++) {
+      var p2 = UNITS[u].filter(function (i) { return c[i] & bit(d); });
+      if (p2.length < 2) continue;
+      if (p2.every(function (i) { return BOX[i] === BOX[p2[0]]; })) {
+        var bx = 18 + BOX[p2[0]];
+        var e2 = elimFrom(c, UNITS[bx], bit(d), p2);
+        if (e2.length) yield mk('claiming', p2, keyOf(p2, bit(d)), e2, null, 'Sur la ' + unitName(u) + ', le ' + d + ' est forcément dans le ' + unitName(bx) + ' (cases ' + p2.map(name).join(', ') + '). On peut l’éliminer du reste du bloc.');
+      }
+    }
+  }
+  function* subsets(v, c) {
+    for (var u = 0; u < 27; u++) {
+      var empt = UNITS[u].filter(function (i) { return !v[i] && c[i]; });
+      // paire nue
+      for (var a = 0; a < empt.length; a++) for (var b = a + 1; b < empt.length; b++) {
+        var x = empt[a], y = empt[b];
+        if (pc(c[x]) === 2 && c[x] === c[y]) {
+          var e = elimFrom(c, empt, c[x], [x, y]);
+          if (e.length) yield mk('npair', [x, y], keyOf([x, y], c[x]), e, null, 'Les cases ' + name(x) + ' et ' + name(y) + ' ne contiennent que ' + digits(c[x]).join(' et ') + ' : ces deux chiffres leur sont réservés dans la ' + unitName(u) + '.');
+        }
+      }
+      // paire cachée
+      for (var d1 = 1; d1 <= 9; d1++) for (var d2 = d1 + 1; d2 <= 9; d2++) {
+        var p1 = empt.filter(function (i) { return c[i] & bit(d1); }), q2 = empt.filter(function (i) { return c[i] & bit(d2); });
+        if (p1.length === 2 && q2.length === 2 && p1[0] === q2[0] && p1[1] === q2[1]) {
+          var m = bit(d1) | bit(d2);
+          var e3 = elimFrom(c, p1, ALL & ~m);
+          if (e3.length) yield mk('hpair', p1, keyOf(p1, m), e3, null, 'Dans la ' + unitName(u) + ', ' + d1 + ' et ' + d2 + ' ne peuvent aller qu’en ' + name(p1[0]) + ' et ' + name(p1[1]) + ' : les autres candidats de ces deux cases disparaissent.');
+        }
+      }
+      // triplet nu
+      for (a = 0; a < empt.length; a++) for (b = a + 1; b < empt.length; b++) for (var k = b + 1; k < empt.length; k++) {
+        var cs = [empt[a], empt[b], empt[k]], um = c[cs[0]] | c[cs[1]] | c[cs[2]];
+        if (pc(um) === 3 && cs.every(function (i) { return pc(c[i]) >= 2; })) {
+          var e4 = elimFrom(c, empt, um, cs);
+          if (e4.length) yield mk('ntriple', cs, keyOf(cs, um), e4, null, 'Les cases ' + cs.map(name).join(', ') + ' se partagent les seuls chiffres ' + digits(um).join(', ') + ' dans la ' + unitName(u) + '.');
+        }
+      }
+    }
+  }
+  function* xwing(v, c) {
+    for (var d = 1; d <= 9; d++) for (var t = 0; t < 2; t++) {
+      // t=0 : base lignes, couverture colonnes ; t=1 : l'inverse
+      var base = t === 0 ? 0 : 9, cover = t === 0 ? COL : ROW;
+      var lists = [];
+      for (var l = 0; l < 9; l++) lists.push(UNITS[base + l].filter(function (i) { return c[i] & bit(d); }));
+      for (var a = 0; a < 9; a++) for (var b = a + 1; b < 9; b++) {
+        var A = lists[a], B = lists[b];
+        if (A.length !== 2 || B.length !== 2) continue;
+        if (cover[A[0]] !== cover[B[0]] || cover[A[1]] !== cover[B[1]]) continue;
+        var cells = [A[0], A[1], B[0], B[1]];
+        var cu1 = (t === 0 ? 9 : 0) + cover[A[0]], cu2 = (t === 0 ? 9 : 0) + cover[A[1]];
+        var e = elimFrom(c, UNITS[cu1].concat(UNITS[cu2]), bit(d), cells);
+        if (e.length) yield mk('xwing', cells, keyOf(cells, bit(d)), e, null,
+          'Sur les ' + (t === 0 ? 'lignes ' : 'colonnes ') + (a + 1) + ' et ' + (b + 1) + ', le ' + d + ' n’a que deux places, alignées sur les mêmes ' + (t === 0 ? 'colonnes ' : 'lignes ') + (cover[A[0]] + 1) + ' et ' + (cover[A[1]] + 1) + '. Le ' + d + ' occupe donc forcément deux coins opposés du rectangle : on l’élimine du reste de ces ' + (t === 0 ? 'colonnes.' : 'lignes.'));
+      }
+    }
+  }
+  function* xywing(v, c) {
+    var bv = []; for (var i = 0; i < 81; i++) if (!v[i] && pc(c[i]) === 2) bv.push(i);
+    for (var p = 0; p < bv.length; p++) {
+      var piv = bv[p], ab = digits(c[piv]);
+      var wings = bv.filter(function (w) { return w !== piv && SEES[piv][w] && pc(c[w] & c[piv]) === 1; });
+      for (var x = 0; x < wings.length; x++) for (var y = x + 1; y < wings.length; y++) {
+        var w1 = wings[x], w2 = wings[y];
+        var sh1 = c[w1] & c[piv], sh2 = c[w2] & c[piv];
+        if (sh1 === sh2) continue;
+        var z1 = c[w1] & ~c[piv], z2 = c[w2] & ~c[piv];
+        if (z1 !== z2) continue;
+        var z = digits(z1)[0];
+        var e = elimFrom(c, commonPeers(w1, w2), z1, [piv]);
+        if (e.length) {
+          var key = {}; key[piv] = c[piv]; key[w1] = c[w1]; key[w2] = c[w2];
+          yield mk('xywing', [piv, w1, w2], key, e, null, 'Pivot ' + name(piv) + ' {' + ab.join(',') + '}, pinces ' + name(w1) + ' {' + digits(c[w1]).join(',') + '} et ' + name(w2) + ' {' + digits(c[w2]).join(',') + '}. Quel que soit le chiffre du pivot, l’une des deux pinces vaut ' + z + ' : toute case qui voit les deux pinces ne peut pas contenir ' + z + '.');
+        }
+      }
+    }
+  }
+  function* wwing(v, c) {
+    var bv = []; for (var i = 0; i < 81; i++) if (!v[i] && pc(c[i]) === 2) bv.push(i);
+    for (var p = 0; p < bv.length; p++) for (var q = p + 1; q < bv.length; q++) {
+      var A = bv[p], B = bv[q];
+      if (c[A] !== c[B] || SEES[A][B]) continue;
+      var ds = digits(c[A]);
+      for (var k = 0; k < 2; k++) {
+        var lk = ds[k], el = ds[1 - k];
+        var targets = commonPeers(A, B).filter(function (t) { return c[t] & bit(el); });
+        if (!targets.length) continue;
+        for (var u = 0; u < 27; u++) {
+          var pos = UNITS[u].filter(function (i) { return c[i] & bit(lk); });
+          if (pos.length !== 2 || pos.indexOf(A) >= 0 || pos.indexOf(B) >= 0) continue;
+          var L1 = pos[0], L2 = pos[1], ok = false;
+          if (SEES[A][L1] && SEES[B][L2]) ok = true; else if (SEES[A][L2] && SEES[B][L1]) { var tt = L1; L1 = L2; L2 = tt; ok = true; }
+          if (!ok) continue;
+          var e = elimFrom(c, targets, bit(el));
+          var key = {}; key[A] = c[A]; key[B] = c[B]; key[L1] = bit(lk); key[L2] = bit(lk);
+          yield mk('wwing', [A, B, L1, L2], key, e, null, 'Les cases ' + name(A) + ' et ' + name(B) + ' contiennent toutes deux {' + ds.join(',') + '}. Dans la ' + unitName(u) + ', le ' + lk + ' n’a que deux places (' + name(L1) + ' et ' + name(L2) + '), et chacune voit l’une des deux cases. L’une de ' + name(A) + ' ou ' + name(B) + ' vaut donc forcément ' + el + ' : on élimine ' + el + ' des cases qui voient les deux.');
+        }
+      }
+    }
+  }
+  var FINDERS = [nakedSingles, hiddenSingles, locked, subsets, xwing, xywing, wwing];
+
+  /* filter(step) -> bool permet d'écarter les étapes (ex : éliminations incorrectes) */
+  function findStep(v, c, opts) {
+    opts = opts || {};
+    for (var f = 0; f < FINDERS.length; f++) {
+      var it = FINDERS[f](v, c);
+      for (var s = it.next(); !s.done; s = it.next()) {
+        var st = s.value;
+        if (opts.minLevel && st.level < opts.minLevel) break;
+        if (opts.only && opts.only.indexOf(st.tech) < 0) continue;
+        if (opts.filter && !opts.filter(st)) continue;
+        return st;
+      }
+    }
+    return null;
+  }
+  function applyStep(v, c, st) {
+    if (st.place) {
+      var i = st.place[0], d = st.place[1];
+      v[i] = d; c[i] = 0;
+      PEERS[i].forEach(function (p) { c[p] &= ~bit(d); });
+    }
+    st.elim.forEach(function (e) { c[e[0]] &= ~bit(e[1]); });
+  }
+
+  /* ---- notation : résout logiquement, renvoie le niveau max et les techniques utilisées ---- */
+  function grade(puzzle) {
+    var v = puzzle.slice(), c = computeCands(v), used = {}, maxL = 0, steps = 0;
+    while (true) {
+      if (v.every(function (x) { return x; })) return { solved: true, level: maxL, used: used, steps: steps };
+      var st = findStep(v, c);
+      if (!st) return { solved: false, level: 9, used: used, steps: steps };
+      used[st.tech] = (used[st.tech] || 0) + 1; if (st.level > maxL) maxL = st.level;
+      applyStep(v, c, st); steps++;
+    }
+  }
+
+  function mulberry(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+  function makePuzzle(rnd) {
+    var sol = solve(new Array(81).fill(0), 1, rnd).solution;
+    var p = sol.slice(), order = shuffle(Array.from({ length: 41 }, function (_, i) { return i; }), rnd);
+    for (var k = 0; k < order.length; k++) {
+      var i = order[k], j = 80 - i, a = p[i], b = p[j];
+      p[i] = 0; p[j] = 0;
+      if (solve(p, 2).count !== 1) { p[i] = a; p[j] = b; }
+    }
+    return { puzzle: p, solution: sol };
+  }
+  /* target : 'facile' | 'moyen' | 'difficile' | 'xwing' | 'xywing' | 'wwing' */
+  function matches(g, target) {
+    if (!g.solved) return false;
+    if (target === 'facile') return g.level === 1;
+    if (target === 'moyen') return g.level === 2;
+    if (target === 'difficile') return g.level === 3;
+    return !!g.used[target];
+  }
+  function generate(target, seed, maxMs) {
+    var rnd = mulberry(seed || (Math.random() * 1e9) | 0), t0 = Date.now(), tries = 0, best = null;
+    while (true) {
+      tries++;
+      var pz = makePuzzle(rnd), g = grade(pz.puzzle);
+      pz.grade = g; pz.tries = tries;
+      if (matches(g, target)) { pz.ok = true; return pz; }
+      if (g.solved && (!best || g.level > best.grade.level)) best = pz;
+      if (maxMs && Date.now() - t0 > maxMs) { (best || pz).ok = false; return best || pz; }
+    }
+  }
+
+  return { ROW: ROW, COL: COL, BOX: BOX, UNITS: UNITS, PEERS: PEERS, SEES: SEES, bit: bit, pc: pc, digits: digits, name: name,
+    solve: solve, computeCands: computeCands, findStep: findStep, applyStep: applyStep, grade: grade, generate: generate, TECH_NAMES: TECH_NAMES, TECH_LEVEL: TECH_LEVEL };
+})();
+if (typeof module !== 'undefined') module.exports = SE;
+
+</script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var bit = SE.bit, ROW = SE.ROW, COL = SE.COL, BOX = SE.BOX;
+  var LEVEL_LABEL = { facile: 'Facile', moyen: 'Moyen', difficile: 'Difficile', xwing: 'X-Wing', xywing: 'XY-Wing', wwing: 'W-Wing', import: 'Importée' };
+  var S = null, undoStack = [], hint = null, shiftHeld = false;
+  /* geste : 'digit' = on choisit le chiffre puis on touche les cases ; 'cell' = case puis chiffre */
+  var gesture = 'digit', ad = -1; /* ad : chiffre actif (0 = gomme, -1 = aucun) */
+  try { if (localStorage.getItem('sudoku-gesture') === 'cell') gesture = 'cell'; } catch (e) {}
+
+  /* ---------- état ---------- */
+  function newState(puzzle, solution, level) {
+    return { givens: puzzle.slice(), vals: puzzle.slice(), kind: puzzle.map(function (v) { return v ? 'g' : ''; }), marks: new Array(81).fill(0),
+      solution: solution, level: level, mode: 'n', sel: -1, training: false, advOnly: false, hypo: null, elapsed: 0, won: false };
+  }
+  function snap() { return { vals: S.vals.slice(), kind: S.kind.slice(), marks: S.marks.slice(), hypo: S.hypo }; }
+  function restore(s) { S.vals = s.vals.slice(); S.kind = s.kind.slice(); S.marks = s.marks.slice(); S.hypo = s.hypo; }
+  function pushUndo() { undoStack.push(snap()); if (undoStack.length > 300) undoStack.shift(); }
+  function save() { try { localStorage.setItem('sudoku-entrainement', JSON.stringify(S)); } catch (e) {} }
+  function load() { try { var s = JSON.parse(localStorage.getItem('sudoku-entrainement')); if (s && s.vals && s.vals.length === 81 && s.solution) return s; } catch (e) {} return null; }
+
+  /* ---------- actions ---------- */
+  function placeNumber(i, d, asHypo) {
+    if (i < 0 || S.kind[i] === 'g') return;
+    var k = asHypo ? 'h' : 'n';
+    var before = snap();
+    pushUndo();
+    if (S.vals[i] === d && S.kind[i] === k) { S.vals[i] = 0; S.kind[i] = ''; }
+    else {
+      if (asHypo && !S.hypo) S.hypo = { snap: before, origin: i };
+      S.vals[i] = d; S.kind[i] = k;
+      SE.PEERS[i].forEach(function (p) { S.marks[p] &= ~bit(d); });
+    }
+    changed();
+  }
+  function toggleMark(i, d) {
+    if (i < 0 || S.vals[i]) return;
+    pushUndo(); S.marks[i] ^= bit(d); changed();
+  }
+  function erase(i) {
+    if (i < 0 || S.kind[i] === 'g') return;
+    pushUndo();
+    if (S.vals[i]) { S.vals[i] = 0; S.kind[i] = ''; } else S.marks[i] = 0;
+    changed();
+  }
+  function input(d) {
+    if (S.sel < 0) return;
+    if (S.mode === 'm' || shiftHeld) toggleMark(S.sel, d);
+    else placeNumber(S.sel, d, S.mode === 'h');
+  }
+  function undo() { if (!undoStack.length) return; restore(undoStack.pop()); changed(true); }
+  function cancelHypo() { if (!S.hypo) return; pushUndo(); restore(S.hypo.snap); S.hypo = null; changed(); }
+  function keepHypo() { if (!S.hypo) return; pushUndo(); for (var i = 0; i < 81; i++) if (S.kind[i] === 'h') S.kind[i] = 'n'; S.hypo = null; changed(); }
+  function autoMarks() { pushUndo(); var c = SE.computeCands(S.vals); for (var i = 0; i < 81; i++) S.marks[i] = S.vals[i] ? 0 : c[i]; changed(); }
+  function clearMarks() { pushUndo(); S.marks.fill(0); changed(); }
+  function changed(keepHint) {
+    if (hint && !keepHint) closeHint(true);
+    if (!S.won && !S.hypo && S.vals.every(function (v, i) { return v === S.solution[i]; })) S.won = true;
+    render(); save();
+  }
+
+  /* ---------- indice ---------- */
+  function baseState() { return S.hypo ? S.hypo.snap : { vals: S.vals, kind: S.kind, marks: S.marks }; }
+  function askHint() {
+    if (hint && hint.step && hint.stage === 1) { hint.stage = 2; render(); return; }
+    var b = baseState(), v = b.vals.slice();
+    var wrongCells = [];
+    for (var i = 0; i < 81; i++) if (v[i] && v[i] !== S.solution[i]) wrongCells.push(i);
+    if (wrongCells.length) {
+      hint = { msg: 'Un chiffre posé est faux : la logique ne peut plus avancer. Corrige d’abord ' + (wrongCells.length > 1 ? 'les cases encadrées en rouge.' : 'la case encadrée en rouge.'), err: wrongCells };
+      render(); return;
+    }
+    var c = SE.computeCands(v);
+    for (i = 0; i < 81; i++) if (!v[i] && b.marks[i]) c[i] &= b.marks[i];
+    var missing = [];
+    for (i = 0; i < 81; i++) if (!v[i] && !(c[i] & bit(S.solution[i]))) missing.push(i);
+    if (missing.length) {
+      hint = { msg: 'Tes marques ont éliminé la bonne valeur dans ' + (missing.length > 1 ? 'les cases encadrées en rouge' : 'la case encadrée en rouge') + '. Vérifie-les, ou clique sur « Marques auto » pour repartir sur une base complète.', err: missing };
+      render(); return;
+    }
+    var filter = function (st) {
+      if (st.place && S.solution[st.place[0]] !== st.place[1]) return false;
+      return st.elim.every(function (e) { return S.solution[e[0]] !== e[1]; });
+    };
+    var step = SE.findStep(v, c, { minLevel: S.advOnly ? 3 : 0, filter: filter });
+    if (!step && S.advOnly) {
+      hint = { msg: 'Aucun X-Wing, XY-Wing ni W-Wing pour l’instant. Décoche l’option pour voir la technique plus simple qui débloque la grille.' };
+      render(); return;
+    }
+    if (!step) { hint = { msg: v.every(function (x) { return x; }) ? 'La grille est complète.' : 'Je ne trouve pas de technique de mon répertoire ici. Une hypothèse peut t’aider.' }; render(); return; }
+    hint = { step: step, stage: 1, cands: c };
+    render();
+  }
+  function applyHint() {
+    if (!hint || !hint.step) return;
+    var st = hint.step, c = hint.cands;
+    pushUndo();
+    if (st.place) {
+      var i = st.place[0], d = st.place[1];
+      S.vals[i] = d; S.kind[i] = 'n';
+      SE.PEERS[i].forEach(function (p) { S.marks[p] &= ~bit(d); });
+    }
+    st.elim.forEach(function (e) {
+      if (!S.marks[e[0]]) S.marks[e[0]] = c[e[0]];
+      S.marks[e[0]] &= ~bit(e[1]);
+    });
+    closeHint(true); changed(true);
+  }
+  function closeHint(silent) { hint = null; if (!silent) render(); }
+
+  /* ---------- rendu ---------- */
+  var cells = [];
+  function buildBoard() {
+    var bd = $('board');
+    for (var i = 0; i < 81; i++) {
+      var el = document.createElement('div');
+      var cls = 'cell';
+      if (COL[i] === 2 || COL[i] === 5) cls += ' bR';
+      if (ROW[i] === 2 || ROW[i] === 5) cls += ' bB';
+      if (COL[i] === 8) cls += ' c8'; if (ROW[i] === 8) cls += ' r8';
+      el.className = cls; el.dataset.base = cls; el.dataset.i = i;
+      el.setAttribute('role', 'gridcell'); el.tabIndex = -1;
+      bd.appendChild(el); cells.push(el);
+    }
+    bd.addEventListener('pointerdown', function (e) {
+      var t = e.target.closest('.cell'); if (!t) return;
+      var i = +t.dataset.i;
+      if (gesture === 'digit') {
+        if (ad === 0) { S.sel = i; erase(i); return; }
+        if (ad > 0 && S.kind[i] !== 'g' && !(S.vals[i] && S.vals[i] !== ad && S.mode === 'm')) { S.sel = i; input(ad); return; }
+        if (S.vals[i]) ad = (ad === S.vals[i] ? -1 : S.vals[i]);
+        S.sel = i; render(); return;
+      }
+      S.sel = i; render();
+    });
+  }
+  function buildPad() {
+    var pad = $('pad'), html = '';
+    for (var d = 1; d <= 9; d++) html += '<button data-d="' + d + '" aria-label="' + d + '">' + d + '<small></small></button>';
+    pad.innerHTML = html;
+    pad.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      var d = +b.dataset.d;
+      if (gesture === 'digit') { ad = (ad === d ? -1 : d); render(); return; }
+      input(d);
+    });
+  }
+  function conflicts() {
+    var bad = new Array(81).fill(false);
+    SE.UNITS.forEach(function (u) {
+      for (var a = 0; a < 9; a++) for (var b = a + 1; b < 9; b++) {
+        var x = u[a], y = u[b];
+        if (S.vals[x] && S.vals[x] === S.vals[y]) { bad[x] = true; bad[y] = true; }
+      }
+    });
+    return bad;
+  }
+  function render() {
+    var dg = gesture === 'digit', bad = conflicts(), sel = S.sel, selV = dg ? (ad > 0 ? ad : 0) : (sel >= 0 ? S.vals[sel] : 0);
+    var st = hint && hint.step, stage2 = st && hint.stage === 2;
+    var blue = {}, elimMap = {}, errMap = {};
+    if (st) st.cells.forEach(function (c) { blue[c] = true; });
+    if (stage2) st.elim.forEach(function (e) { elimMap[e[0]] = (elimMap[e[0]] || 0) | bit(e[1]); });
+    if (hint && hint.err) hint.err.forEach(function (c) { errMap[c] = true; });
+    for (var i = 0; i < 81; i++) {
+      var el = cells[i], cls = el.dataset.base, v = S.vals[i], k = S.kind[i];
+      if (k === 'g') cls += ' given'; else if (k === 'h') { cls += ' hypo'; if (S.hypo && S.hypo.origin === i) cls += ' origin'; }
+      if (!dg && sel >= 0 && i !== sel && (ROW[i] === ROW[sel] || COL[i] === COL[sel] || BOX[i] === BOX[sel])) cls += ' peer';
+      if (selV && v === selV && (dg || i !== sel)) cls += ' same';
+      if (i === sel && (!dg || ad < 0)) cls += ' sel';
+      if (blue[i]) cls += ' hint';
+      if (errMap[i]) cls += ' errflag';
+      if (S.training && k === 'n' && v && v !== S.solution[i]) cls += ' wrong';
+      if (bad[i]) cls += ' conflict';
+      el.className = cls;
+      if (v) { el.innerHTML = '<span class="v">' + v + '</span>'; el.setAttribute('aria-label', SE.name(i) + ' : ' + v); continue; }
+      var m = S.marks[i], key = stage2 && st.keyDigits[i] || 0, el2 = elimMap[i] || 0;
+      var ghost = (stage2 && !m && (blue[i] || el2)) ? hint.cands[i] : 0;
+      if (st && hint.stage === 1 && blue[i] && !m) ghost = 0;
+      var h = '';
+      if (m || ghost || key || el2) {
+        h = '<div class="marks">';
+        for (var d = 1; d <= 9; d++) {
+          var b = bit(d), c = '';
+          var shown = (m & b) || (ghost & b) || (key & b) || (el2 & b);
+          if (!shown) { h += '<span></span>'; continue; }
+          if (el2 & b) c = 'elim'; else if (key & b) c = 'key'; else if (!(m & b)) c = 'ghost'; else if (d === selV) c = 'hl';
+          h += '<span class="' + c + '">' + d + '</span>';
+        }
+        h += '</div>';
+      }
+      el.innerHTML = h; el.setAttribute('aria-label', SE.name(i) + ' : vide');
+    }
+    // pad
+    var counts = new Array(10).fill(0); S.vals.forEach(function (v) { if (v) counts[v]++; });
+    var pad = $('pad'); pad.className = 'pad ' + S.mode;
+    pad.querySelectorAll('button[data-d]').forEach(function (b) {
+      var d = +b.dataset.d; if (!d) return;
+      b.querySelector('small').textContent = 9 - counts[d] > 0 ? 9 - counts[d] : '';
+      b.classList.toggle('done', counts[d] >= 9);
+      b.classList.toggle('active', dg && ad === d);
+    });
+    ['n', 'm', 'h'].forEach(function (md) { $('mode' + md.toUpperCase()).setAttribute('aria-pressed', S.mode === md ? 'true' : 'false'); });
+    $('eraseBtn').classList.toggle('active', dg && ad === 0); $('gestureChk').checked = dg;
+    $('training').checked = S.training; $('advOnly').checked = S.advOnly;
+    $('undo').disabled = !undoStack.length;
+    // hypothèse
+    $('hypobar').hidden = !S.hypo;
+    if (S.hypo) $('hypoOrigin').textContent = SE.name(S.hypo.origin);
+    // indice
+    var ht = $('hinttext'), ha = $('hintActions');
+    if (!hint) { ht.innerHTML = '<span class="small">Le bouton cherche la prochaine technique à trouver et entoure les cases concernées en bleu. Un second clic montre l’élimination.</span>'; ha.hidden = true; }
+    else if (!st) { ht.innerHTML = '<span class="' + (hint.err ? 'err' : '') + '">' + hint.msg + '</span>'; ha.hidden = false; $('hintMore').hidden = true; $('hintApply').hidden = true; }
+    else {
+      var lvl = st.level === 3 ? 'Technique avancée' : st.level === 2 ? 'Technique intermédiaire' : 'Technique de base';
+      if (hint.stage === 1) ht.innerHTML = '<span class="label">' + lvl + '</span><b class="t">' + st.title + '</b><span>Les cases en bleu forment le motif. À toi de trouver ' + (st.place ? 'le chiffre à poser.' : 'ce qu’il élimine.') + '</span>';
+      else ht.innerHTML = '<span class="label">' + lvl + '</span><b class="t">' + st.title + '</b><span>' + st.text + '</span><span class="small">' + (st.place ? 'À poser : ' + st.place[1] + ' en ' + SE.name(st.place[0]) + '.' : 'Éliminations en rouge : ' + st.elim.map(function (e) { return e[1] + ' en ' + SE.name(e[0]); }).join(', ') + '.') + '</span>';
+      ha.hidden = false; $('hintMore').hidden = hint.stage !== 1; $('hintApply').hidden = hint.stage !== 2;
+    }
+    // en-tête
+    $('levelPill').textContent = LEVEL_LABEL[S.level] || S.level;
+    $('win').hidden = !S.won;
+    if (S.won) $('win').textContent = 'Grille terminée en ' + fmt(S.elapsed) + '. Bravo !';
+  }
+  function fmt(s) { var m = Math.floor(s / 60); return (m < 10 ? '0' : '') + m + ':' + ((s % 60) < 10 ? '0' : '') + (s % 60); }
+
+  /* ---------- nouvelle grille ---------- */
+  function startGame(puzzle, solution, level) {
+    var keep = S ? { training: S.training, advOnly: S.advOnly, mode: S.mode } : {};
+    S = newState(puzzle, solution, level);
+    if (keep.mode) { S.training = keep.training; S.advOnly = keep.advOnly; S.mode = keep.mode; }
+    undoStack = []; hint = null; render(); save();
+  }
+  function generate() {
+    var lvl = $('level').value;
+    $('genMsg').textContent = 'Génération en cours…'; $('newGame').disabled = true;
+    setTimeout(function () {
+      var pz = SE.generate(lvl, 0, 6000);
+      $('newGame').disabled = false;
+      startGame(pz.puzzle, pz.solution, pz.ok ? lvl : 'difficile');
+      var used = Object.keys(pz.grade.used).filter(function (t) { return SE.TECH_LEVEL[t] >= 2; }).map(function (t) { return SE.TECH_NAMES[t]; });
+      $('genMsg').textContent = (pz.ok ? '' : 'Pas trouvé de grille de ce type à temps, voici la plus proche. ') + (used.length ? 'Techniques nécessaires : ' + used.join(', ') + '.' : 'Résoluble avec les singletons.');
+    }, 30);
+  }
+  function importGrid() {
+    var txt = $('importTxt').value.replace(/[^0-9.]/g, '');
+    if (txt.length !== 81) { $('genMsg').textContent = 'Il faut exactement 81 caractères (chiffres, 0 ou point), j’en compte ' + txt.length + '.'; return; }
+    var p = txt.split('').map(function (ch) { return ch === '.' ? 0 : +ch; });
+    var r = SE.solve(p, 2);
+    if (r.count === 0) { $('genMsg').textContent = 'Cette grille n’a pas de solution.'; return; }
+    if (r.count > 1) { $('genMsg').textContent = 'Cette grille a plusieurs solutions, elle ne peut pas servir à l’entraînement.'; return; }
+    startGame(p, r.solution, 'import');
+    var g = SE.grade(p);
+    $('genMsg').textContent = 'Grille importée. ' + (g.solved ? 'Techniques nécessaires : ' + (Object.keys(g.used).map(function (t) { return SE.TECH_NAMES[t]; }).join(', ')) + '.' : 'Elle demande des techniques au-delà de celles que l’aide connaît.');
+  }
+
+  /* ---------- évènements ---------- */
+  function setMode(m) { S.mode = m; render(); save(); }
+  document.querySelectorAll('.mode[data-mode]').forEach(function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode); }); });
+  function applyFlip(f) { $('console').classList.toggle('flip', f); try { localStorage.setItem('sudoku-flip', f ? '1' : '0'); } catch (e) {} }
+  var flip = true; try { flip = localStorage.getItem('sudoku-flip') !== '0'; } catch (e) {}
+  applyFlip(flip);
+  $('flipBtn').onclick = function () { flip = !flip; applyFlip(flip); };
+  $('undo').onclick = undo; $('eraseBtn').onclick = function () { if (gesture === 'digit') { ad = (ad === 0 ? -1 : 0); render(); } else erase(S.sel); };
+  $('gestureChk').onchange = function () { gesture = this.checked ? 'digit' : 'cell'; ad = -1; try { localStorage.setItem('sudoku-gesture', gesture); } catch (e) {} render(); }; $('autoMarks').onclick = autoMarks; $('clearMarks').onclick = clearMarks;
+  $('hypoCancel').onclick = cancelHypo; $('hypoKeep').onclick = keepHypo;
+  $('ask').onclick = askHint; $('hintMore').onclick = function () { if (hint) { hint.stage = 2; render(); } };
+  $('hintApply').onclick = applyHint; $('hintClose').onclick = function () { closeHint(); };
+  $('training').onchange = function () { S.training = this.checked; render(); save(); };
+  $('advOnly').onchange = function () { S.advOnly = this.checked; hint = null; render(); save(); };
+  $('newGame').onclick = generate;
+  $('restart').onclick = function () { startGame(S.givens, S.solution, S.level); };
+  $('importBtn').onclick = importGrid;
+
+  document.addEventListener('keydown', function (e) {
+    if (e.target.matches('input[type=text], select')) return;
+    shiftHeld = e.shiftKey;
+    var m = /^(?:Digit|Numpad)([0-9])$/.exec(e.code), d = m ? +m[1] : (/^[0-9]$/.test(e.key) ? +e.key : -1);
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); undo(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === '?' || e.key === ',' && e.shiftKey) { e.preventDefault(); askHint(); return; }
+    if (d > 0) { e.preventDefault(); input(d); shiftHeld = false; return; }
+    if (d === 0 || e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); erase(S.sel); return; }
+    var k = e.key.toLowerCase();
+    if (k === 'n' || k === 'm' || k === 'h') { setMode(k); return; }
+    if (e.key === 'Escape') { if (hint) closeHint(); else { S.sel = -1; render(); } return; }
+    var mv = { ArrowUp: -9, ArrowDown: 9, ArrowLeft: -1, ArrowRight: 1 }[e.key];
+    if (mv) {
+      e.preventDefault();
+      if (S.sel < 0) S.sel = 40;
+      else { var r = ROW[S.sel], c = COL[S.sel];
+        if (mv === -9) r = (r + 8) % 9; if (mv === 9) r = (r + 1) % 9; if (mv === -1) c = (c + 8) % 9; if (mv === 1) c = (c + 1) % 9;
+        S.sel = r * 9 + c; }
+      render();
+    }
+  });
+  document.addEventListener('keyup', function (e) { shiftHeld = e.shiftKey; });
+
+  setInterval(function () {
+    if (S && !S.won && document.visibilityState === 'visible') { S.elapsed++; $('timer').textContent = fmt(S.elapsed); if (S.elapsed % 10 === 0) save(); }
+  }, 1000);
+
+  /* ---------- démarrage ---------- */
+  buildBoard(); buildPad();
+  var saved = load();
+  if (saved) { S = saved; S.sel = -1; render(); $('timer').textContent = fmt(S.elapsed); }
+  else {
+    $('level').value = 'xwing';
+    var pz = SE.generate('xwing', 0, 3000);
+    startGame(pz.puzzle, pz.solution, pz.ok ? 'xwing' : 'difficile');
+    $('genMsg').textContent = 'Grille d’exemple : elle demande un X-Wing quelque part.';
+  }
+})();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+</script>
+</body>
+</html>
